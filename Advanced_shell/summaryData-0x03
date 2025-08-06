@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# Output CSV file
+output_file="report.csv"
+
+# CSV header
+echo "Name,Height(dm),Weight(hg)" > "$output_file"
+
+# Loop through all JSON files
+for file in *.json; do
+  # Skip if no JSON files are found
+  [ -e "$file" ] || continue
+
+  name=$(jq -r '.name' "$file" | sed 's/.*/\u&/')  # Capitalize first letter
+  height=$(jq -r '.height' "$file")
+  weight=$(jq -r '.weight' "$file")
+
+  echo "$name,$height,$weight" >> "$output_file"
+done
+
+# Display contents
+echo "✅ Report generated: $output_file"
+cat "$output_file"
+
+# Calculate averages using awk (skip header line)
+echo ""
+awk -F',' 'NR > 1 {
+  total_height += $2;
+  total_weight += $3;
+  count++;
+}
+END {
+  if (count > 0) {
+    printf "Average Height: %.2f dm\n", total_height / count;
+    printf "Average Weight: %.2f hg\n", total_weight / count;
+  } else {
+    print "No data to calculate averages."
+  }
+}' "$output_file"
