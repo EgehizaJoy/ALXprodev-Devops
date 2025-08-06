@@ -3,36 +3,38 @@
 # List of Pokémon to fetch
 pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# API base URL
-base_url="https://pokeapi.co/api/v2/pokemon"
-
-# Create/clear error log
-> errors.txt
-
-# Function to fetch one Pokémon in the background
+# Function to fetch data for a single Pokémon
 fetch_pokemon() {
-  name=$1
-  url="${base_url}/${name}"
-  file="${name}.json"
+  local name="$1"
+  local retries=3
+  local success=false
 
-  echo "🔄 Fetching $name..."
+  for ((i=1; i<=retries; i++)); do
+    echo "Fetching data for $name (attempt $i)..."
+    
+    # Fetch Pokémon data and save to JSON file
+    if curl -s -f -o "${name}.json" "https://pokeapi.co/api/v2/pokemon/${name}"; then
+      echo "✅ Success: $name"
+      success=true
+      break
+    else
+      echo "⚠️  Failed to fetch $name. Retrying..."
+      sleep 2  # brief delay before retrying
+    fi
+  done
 
-  http_status=$(curl -s -w "%{http_code}" -o "$file" "$url")
-
-  if [ "$http_status" -eq 200 ]; then
-    echo "✅ $name saved as $file"
-  else
-    echo "❌ Failed to fetch $name (HTTP $http_status)" | tee -a errors.txt
-    rm -f "$file"
+  if [ "$success" = false ]; then
+    echo "❌ Failed to fetch $name after $retries attempts." >> error.log
   fi
 }
 
-# Launch fetches in parallel
+# Start fetching each Pokémon in the background
 for pokemon in "${pokemon_list[@]}"; do
   fetch_pokemon "$pokemon" &
 done
 
-# Wait for all background jobs to complete
+# Wait for all background fetches to complete
 wait
 
-echo "🚀 All Pokémon fetch jobs completed!"
+echo "✅ All Pokémon data retrieved."
+
