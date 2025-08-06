@@ -1,31 +1,49 @@
 #!/bin/bash
 
-# List of Pokémon
+# List of Pokémon to fetch
 pokemon_list=("bulbasaur" "ivysaur" "venusaur" "charmander" "charmeleon")
 
-# Base API URL
+# API base URL
 base_url="https://pokeapi.co/api/v2/pokemon"
 
-# Delay in seconds to avoid rate-limiting
+# Delay between requests (seconds)
 delay_seconds=2
 
-# Loop through each Pokémon
+# Max number of retry attempts per Pokémon
+max_retries=3
+
+# Clear or create error log
+> errors.txt
+
 for name in "${pokemon_list[@]}"; do
   file_name="${name}.json"
   url="${base_url}/${name}"
+  echo "🔍 Fetching data for $name..."
 
-  echo "Fetching data for $name..."
+  attempt=1
+  success=false
 
-  # Make the API request and capture HTTP status
-  http_status=$(curl -s -w "%{http_code}" -o "$file_name" "$url")
+  while [ $attempt -le $max_retries ]; do
+    echo "  Attempt $attempt..."
+    http_status=$(curl -s -w "%{http_code}" -o "$file_name" "$url")
 
-  if [ "$http_status" -eq 200 ]; then
-    echo "✅ $name.json saved."
-  else
-    echo "❌ Failed to fetch $name (HTTP $http_status)" | tee -a errors.txt
-    rm -f "$file_name"  # Remove incomplete file
+    if [ "$http_status" -eq 200 ]; then
+      echo "  ✅ Success: $file_name saved."
+      success=true
+      break
+    else
+      echo "  ❌ Failed (HTTP $http_status)"
+      rm -f "$file_name"  # Delete bad response
+      ((attempt++))
+      sleep "$delay_seconds"
+    fi
+  done
+
+  if [ "$success" = false ]; then
+    echo "❗ ERROR: Failed to fetch $name after $max_retries attempts." | tee -a errors.txt
   fi
 
-  # Delay to avoid rate-limiting
+  # Respectful delay before next Pokémon
   sleep "$delay_seconds"
 done
+
